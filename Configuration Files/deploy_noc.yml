@@ -1,0 +1,73 @@
+---
+- name: Deploy Metrics Agents to All Nodes
+  hosts: all_nodes
+  become: yes
+  tasks:
+    - name: Install Prometheus Node Exporter
+      apt:
+        name: prometheus-node-exporter
+        state: present
+        update_cache: yes
+    - name: Ensure Node Exporter is running
+      service:
+        name: prometheus-node-exporter
+        state: started
+        enabled: yes
+
+- name: Deploy NOC Server (Prometheus & Grafana)
+  hosts: monitor
+  become: yes
+  tasks:
+    - name: Install Prometheus
+      apt:
+        name: prometheus
+        state: present
+        update_cache: yes
+
+    - name: Install prerequisites for Grafana
+      apt:
+        name: ['apt-transport-https', 'software-properties-common', 'wget', 'gpg']
+        state: present
+
+    - name: Add Grafana GPG key
+      apt_key:
+        url: https://apt.grafana.com/gpg.key
+        state: present
+
+    - name: Add Grafana repository
+      apt_repository:
+        repo: deb https://apt.grafana.com stable main
+        state: present
+
+    - name: Install Grafana
+      apt:
+        name: grafana
+        state: present
+        update_cache: yes
+
+    - name: Configure Prometheus to scrape all nodes
+      copy:
+        dest: /etc/prometheus/prometheus.yml
+        content: |
+          global:
+            scrape_interval: 15s
+          scrape_configs:
+            - job_name: 'jms_cluster'
+              static_configs:
+                - targets: 
+                  - '192.168.56.10:9100' # LB
+                  - '192.168.56.11:9100' # Web1
+                  - '192.168.56.12:9100' # Web2
+                  - '192.168.56.13:9100' # Web3
+                  - '192.168.56.20:9100' # Monitor
+                  
+    - name: Restart Prometheus service
+      service:
+        name: prometheus
+        state: restarted
+
+    - name: Start and enable Grafana service
+      service:
+        name: grafana-server
+        state: started
+        enabled: yes

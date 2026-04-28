@@ -1,0 +1,72 @@
+---
+- name: Deploy Dynamic PHP Application
+  hosts: webservers
+  become: yes
+  tasks:
+    - name: Configure Nginx to use PHP
+      copy:
+        dest: /etc/nginx/sites-available/default
+        content: |
+          server {
+              listen 80 default_server;
+              listen [::]:80 default_server;
+              root /var/www/html;
+              index index.php index.html index.htm;
+              server_name _;
+              location / {
+                  try_files $uri $uri/ =404;
+              }
+              location ~ \.php$ {
+                  include snippets/fastcgi-php.conf;
+                  fastcgi_pass unix:/var/run/php/php8.1-fpm.sock; # Adjust version if needed based on Ubuntu release
+              }
+          }
+
+    - name: Restart Nginx to load PHP config
+      service:
+        name: nginx
+        state: restarted
+
+    - name: Deploy PHP Application File
+      copy:
+        dest: /var/www/html/index.php
+        content: |
+          <?php
+          $servername = "192.168.56.13";
+          $username = "db_user";
+          $password = "Admin123!";
+          $dbname = "enterprise_db";
+
+          // Create connection
+          $conn = new mysqli($servername, $username, $password, $dbname);
+
+          echo "<html><body style='background-color: #1a1a1a; color: white; text-align: center; font-family: sans-serif; padding-top: 50px;'>";
+          echo "<h1>JMS Enterprise Cluster</h1>";
+          echo "<h2 style='color: #00ff00;'>Served by Node: " . gethostname() . "</h2>";
+
+          // Check connection
+          if ($conn->connect_error) {
+            die("<h3 style='color: red;'>Database Connection Failed: " . $conn->connect_error . "</h3>");
+          }
+          echo "<h3 style='color: #00aaff;'>Database Connection: SUCCESS</h3>";
+
+          $sql = "SELECT id, node_name, status FROM fleet";
+          $result = $conn->query($sql);
+
+          if ($result->num_rows > 0) {
+            echo "<table border='1' style='margin-left: auto; margin-right: auto; width: 50%; border-collapse: collapse;'><tr><th>ID</th><th>Node Name</th><th>Status</th></tr>";
+            // output data of each row
+            while($row = $result->fetch_assoc()) {
+              echo "<tr><td>" . $row["id"]. "</td><td>" . $row["node_name"]. "</td><td style='color: #00ff00;'>" . $row["status"]. "</td></tr>";
+            }
+            echo "</table>";
+          } else {
+            echo "0 results";
+          }
+          $conn->close();
+          echo "</body></html>";
+
+    - name: Remove static HTML file to force PHP
+      file:
+        path: /var/www/html/index.html
+        state: absent

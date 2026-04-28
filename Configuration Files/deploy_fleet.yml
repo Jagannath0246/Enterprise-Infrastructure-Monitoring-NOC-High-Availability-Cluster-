@@ -1,0 +1,52 @@
+---
+- name: Configure Web Fleet
+  hosts: webservers
+  become: yes
+  tasks:
+    - name: Install Nginx
+      apt:
+        name: nginx
+        state: present
+        update_cache: yes
+
+    - name: Create Unique Landing Page
+      copy:
+        dest: /var/www/html/index.html
+        content: |
+          <html>
+          <body style="background-color: #1a1a1a; color: white; text-align: center; font-family: sans-serif; padding-top: 100px;">
+            <h1>JMS Enterprise Cluster</h1>
+            <h2 style="color: #00ff00;">Successfully Connected to: {{ inventory_hostname }}</h2>
+            <p>Node IP: {{ ansible_host }}</p>
+          </body>
+          </html>
+
+- name: Configure Load Balancer
+  hosts: loadbalancer
+  become: yes
+  tasks:
+    - name: Install Nginx on LB
+      apt:
+        name: nginx
+        state: present
+
+    - name: Setup Reverse Proxy Config
+      copy:
+        dest: /etc/nginx/sites-available/default
+        content: |
+          upstream my_web_fleet {
+              server 192.168.56.11; # web1
+              server 192.168.56.12; # web2
+              server 192.168.56.13; # web3
+          }
+          server {
+              listen 80;
+              location / {
+                  proxy_pass http://my_web_fleet;
+              }
+          }
+
+    - name: Restart Nginx on LB
+      service:
+        name: nginx
+        state: restarted
