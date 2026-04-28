@@ -1,0 +1,69 @@
+This document outlines the standard operating procedures (SOP) for provisioning, starting, and gracefully tearing down the Highly Available (HA) Enterprise Cluster.
+
+PREREQUISITES
+Before running this project, ensure the following dependencies are installed on your local host machine:
+
+VirtualBox (Hypervisor for running the virtual machines)
+
+Vagrant (For automating the hardware provisioning)
+
+Ansible (For configuration management and application deployment)
+
+Git (For cloning this repository)
+
+PHASE 1: SPINNING UP THE INFRASTRUCTURE
+
+Step 1: Clone the Repository
+Download the project files to your local machine and navigate into the directory:
+
+git clone https://github.com/Jagannath0246/Enterprise-Infrastructure-Monitoring-NOC-High-Availability-Cluster-.git
+cd Enterprise-Infrastructure-Monitoring-NOC-High-Availability-Cluster
+
+(Note: Replace YOUR_USERNAME and YOUR_REPO_NAME with your actual GitHub details).
+
+Step 2: Provision the Hardware (Vagrant)
+Boot up the 5 virtual machines. Vagrant will automatically assign the static IPs defined in the Vagrantfile and configure the private NAT network.
+
+vagrant up
+
+(Allow 3-5 minutes for all nodes to fully boot and acquire networking).
+
+Step 3: Execute Configuration Management (Ansible)
+Once the hardware is online, use Ansible to configure the operating systems, install the software, and establish the networking rules. Run these playbooks in the following exact order:
+
+Deploy the Load Balancer and Web Fleet:
+ansible-playbook -i inventory.ini deploy_fleet.yml
+
+Provision the Database Tier:
+ansible-playbook -i inventory.ini setup_db.yml
+
+Deploy the Dynamic PHP Application:
+ansible-playbook -i inventory.ini deploy_php_app.yml
+
+Step 4: Verify the Deployment
+To mathematically prove the load balancer is working, bypass your browser cache and run this loop in your terminal:
+
+for i in {1..6}; do curl -s http://192.168.56.10 | grep "Node"; done
+
+You should see the output successfully alternating between web1, web2, and web3.
+
+PHASE 2: STOPPING AND TEARING DOWN
+
+To conserve your host machine's CPU and RAM, you should stop the cluster when not actively running tests. You have two options depending on your needs.
+
+Option A: Graceful Shutdown (Sleep Mode)
+Use this option if you want to turn off the VMs but keep all your databases, files, and configurations intact for the next time you work on the project.
+
+vagrant halt
+
+To wake the cluster back up later, simply run "vagrant up" again.
+
+Option B: The Clean Slate (Nuclear Teardown)
+Use this option to permanently delete the virtual machines and free up hard drive space. This destroys the virtual hard disks and unregisters the VMs from VirtualBox.
+
+vagrant destroy -f
+
+Since this infrastructure is fully defined as code, you can completely rebuild the cluster from scratch anytime by returning to Phase 1.
+
+IMPORTANT NOTE FOR CONTRIBUTORS
+Never commit the hidden .vagrant/ directory or any .vdi / .vmdk files to version control, as they contain heavy machine states and local SSH keys.
